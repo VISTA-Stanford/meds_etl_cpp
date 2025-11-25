@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools", "setuptools-scm"]
+requires = ["setuptools", "setuptools-scm", "pyarrow", "pybind11"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -9,6 +9,9 @@ description = "Optimized algorithms for meds_etl implemented in C++."
 readme = "README.md"
 requires-python=">3.9"
 license = "Apache-2.0"
+dependencies = [
+    "pyarrow>=18.0.0",  # Required at runtime for Arrow libraries
+]
 
 [tool.setuptools_scm]
 
@@ -21,10 +24,14 @@ namespaces = false  # to disable scanning PEP 420 namespaces (true by default)
 [tool.cibuildwheel]
 skip = ["*-musllinux_* pp*"]
 archs = ["auto64"]
-before-build = "git restore native/MODULE.bazel.lock"
+# Build separate wheels for Python 3.10, 3.11, 3.12
+build = ["cp310-*", "cp311-*", "cp312-*"]
 
 [tool.cibuildwheel.linux]
 before-all = "bash build/linux_setup.sh"
+before-build = "git restore native/MODULE.bazel.lock"
 
 [tool.cibuildwheel.macos]
 environment = { MACOSX_DEPLOYMENT_TARGET="12" }
+before-all = "bash setup_dependencies.sh"
+# Uses Makefile build (auto-detects Python version)

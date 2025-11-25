@@ -1,5 +1,5 @@
 build --cxxopt="-std=c++17"
 build --cxxopt="-Wall"
-build --cxxopt="-mavx"
-build --copt="-mavx"
+# build --cxxopt="-mavx"
+# build --copt="-mavx"
 common --enable_workspace

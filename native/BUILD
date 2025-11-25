@@ -36,7 +36,8 @@ pybind_extension(
     srcs=[
         "meds_etl_cpp.cc",
     ],
-    deps=[":perform_etl"],
+    deps=[":perform_etl", ":arrow" ],
+    linkopts = [],
 )
 
 cmake(
@@ -44,8 +45,8 @@ cmake(
     cache_entries = {
         "CMAKE_INSTALL_LIBDIR": "lib",
         "CMAKE_TOOLCHAIN_FILE": "",
-        "CMAKE_C_FLAGS": "-fPIC -I/usr/include -fvisibility=hidden",
-        "CMAKE_CXX_FLAGS": "-fPIC -I/usr/include -fvisibility=hidden",
+        "CMAKE_C_FLAGS": "-fPIC",
+        "CMAKE_CXX_FLAGS": "-fPIC",
         "EP_COMMON_CMAKE_ARGS": "-DWITH_OPENSSL=OFF",
         "ARROW_BUILD_SHARED": "OFF",
         "ARROW_BUILD_STATIC": "ON",
