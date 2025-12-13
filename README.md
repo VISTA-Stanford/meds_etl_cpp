@@ -21,8 +21,6 @@ pip install -e .
 cd native && bazel build //:meds_etl_cpp
 ```
 
-See [BUILD_MAC.md](BUILD_MAC.md) for detailed macOS build instructions.
-
 ## Requirements
 
 - Python ≥3.10
