@@ -13,7 +13,7 @@ High-performance C++ backend for [meds_etl](https://github.com/Medical-Event-Dat
 
 **macOS:**
 ```bash
-pip install -e . --no-build-isolation
+pip install -e .
 ```
 
 **Linux:**

@@ -55,13 +55,22 @@ endif
 
 # Source files
 SOURCES := $(NATIVE_DIR)/meds_etl_cpp.cc $(NATIVE_DIR)/perform_etl.cc
-TARGET := meds_etl_cpp$(SUFFIX)
+
+# Build into package directory as _native module
+# The meds_etl_cpp/__init__.py wrapper imports pyarrow first, then this
+PACKAGE_DIR := meds_etl_cpp
+TARGET := $(PACKAGE_DIR)/_native$(SUFFIX)
+
+# For backwards compatibility, also create the old-style module
+LEGACY_TARGET := meds_etl_cpp$(SUFFIX)
 
 .PHONY: all clean install
 
 all: $(TARGET)
+	@# Create legacy symlink for backwards compatibility
+	@ln -sf $(TARGET) $(LEGACY_TARGET) 2>/dev/null || cp $(TARGET) $(LEGACY_TARGET)
 
-$(TARGET): $(SOURCES) $(ABSEIL_LIBS)
+$(TARGET): $(SOURCES) $(ABSEIL_LIBS) | $(PACKAGE_DIR)
 	$(CXX) -bundle -undefined dynamic_lookup $(CXXFLAGS) \
 		$(PYTHON_INCLUDES) \
 		-I$(ARROW_INCLUDE) \
@@ -70,13 +79,17 @@ $(TARGET): $(SOURCES) $(ABSEIL_LIBS)
 		$(ARROW_LIBARROW) \
 		$(ARROW_LIBPARQUET) \
 		$(ABSEIL_LIBS) \
+		-Wl,-rpath,@loader_path/../pyarrow \
 		-Wl,-rpath,@loader_path \
-		-Wl,-rpath,$(ARROW_LIBDIR) \
 		$(SOURCES) -o $(TARGET)
 	@echo "✅ Built $(TARGET)"
 
+$(PACKAGE_DIR):
+	mkdir -p $(PACKAGE_DIR)
+
 clean:
-	rm -f $(TARGET) *.o
+	rm -f $(TARGET) $(LEGACY_TARGET) *.o
+	rm -f $(PACKAGE_DIR)/_native*.so
 
 install: $(TARGET)
 	$(PYTHON) -m pip install -e .

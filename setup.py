@@ -96,19 +96,19 @@ class HybridBuildExt(build_ext):
             check=True,
         )
         
-        # Get the runtime PyArrow location BEFORE building
-        # (build environment might have different location)
-        import pyarrow
-        runtime_arrow_dir = pyarrow.get_library_dirs()[0]
-        
         subprocess.run(
             args=["make", "-f", ext.makefile],
             cwd=ext.sourcedir,
             check=True,
         )
         
-        # Find the built .so file
-        built_files = list(pathlib.Path(ext.sourcedir).glob("*.so"))
+        # Find the built .so file in the package directory
+        # Makefile builds to meds_etl_cpp/_native.*.so
+        pkg_dir = pathlib.Path(ext.sourcedir) / "meds_etl_cpp"
+        built_files = list(pkg_dir.glob("_native*.so"))
+        if not built_files:
+            # Fallback: check root directory
+            built_files = list(pathlib.Path(ext.sourcedir).glob("meds_etl_cpp*.so"))
         if not built_files:
             raise RuntimeError(f"Could not find built extension for {ext.name}")
         
@@ -118,62 +118,32 @@ class HybridBuildExt(build_ext):
         )
         os.makedirs(parent_directory, exist_ok=True)
         
-        shutil.copy(str(built_files[0]), self.get_ext_fullpath(ext.name))
-        os.chmod(self.get_ext_fullpath(ext.name), 0o755)
+        # Copy built extension to the target location
+        ext_fullpath = self.get_ext_fullpath(ext.name)
+        shutil.copy(str(built_files[0]), ext_fullpath)
+        os.chmod(ext_fullpath, 0o755)
         
-        # Fix rpath to point to runtime PyArrow location (not build-time)
-        # This is critical for pip installs which use isolated build environments
+        # The Makefile sets relative rpath: @loader_path/../pyarrow
+        # This works when installed in site-packages (meds_etl_cpp/_native.so -> ../pyarrow)
+        # The meds_etl_cpp/__init__.py imports pyarrow first as a fallback
+        
+        # Verify rpath is set correctly
         try:
-            # Get all existing rpaths
             result = subprocess.run(
-                ["otool", "-l", self.get_ext_fullpath(ext.name)],
+                ["otool", "-l", ext_fullpath],
                 capture_output=True,
                 text=True,
             )
-            
-            # Extract all rpath entries
-            existing_rpaths = []
-            lines = result.stdout.split('\n')
-            for i, line in enumerate(lines):
-                if 'cmd LC_RPATH' in line:
-                    # The path is 2 lines down
-                    if i + 2 < len(lines) and 'path ' in lines[i + 2]:
-                        path = lines[i + 2].strip().split('path ')[1].split(' (')[0]
-                        existing_rpaths.append(path)
-            
-            print(f"📋 Existing rpaths: {existing_rpaths}")
-            
-            # Remove any rpath that's from a temp build env
-            for rpath in existing_rpaths:
-                if 'pip-build-env' in rpath or '/tmp/' in rpath or '/var/folders' in rpath:
-                    if '/site-packages/pyarrow' in rpath:  # Only remove temp pyarrow paths
-                        try:
-                            subprocess.run(
-                                ["install_name_tool", "-delete_rpath", rpath,
-                                 self.get_ext_fullpath(ext.name)],
-                                check=True,
-                            )
-                            print(f"🗑️  Removed temporary rpath: {rpath}")
-                        except subprocess.CalledProcessError:
-                            pass  # Already removed or doesn't exist
-            
-            # Add the correct runtime rpath if not already there
-            if runtime_arrow_dir not in existing_rpaths:
-                try:
-                    subprocess.run(
-                        ["install_name_tool", "-add_rpath", runtime_arrow_dir,
-                         self.get_ext_fullpath(ext.name)],
-                        check=True,
-                    )
-                    print(f"✅ Added runtime rpath: {runtime_arrow_dir}")
-                except subprocess.CalledProcessError as e:
-                    print(f"⚠️  Could not add rpath (may already exist): {e}")
+            if "@loader_path/../pyarrow" in result.stdout:
+                print(f"✅ Relative rpath configured correctly")
             else:
-                print(f"✅ Runtime rpath already correct: {runtime_arrow_dir}")
-                
+                print(f"⚠️  Adding relative rpath for pyarrow...")
+                subprocess.run(
+                    ["install_name_tool", "-add_rpath", "@loader_path/../pyarrow", ext_fullpath],
+                    check=False,  # May already exist
+                )
         except Exception as e:
-            print(f"⚠️  Warning: Could not fix rpath: {e}")
-            print(f"   Manual fix: bash fix_rpath.sh")
+            print(f"⚠️  Could not verify rpath: {e}")
         
         print(f"✅ Built {ext.name} successfully using Makefile")
     
@@ -245,13 +215,13 @@ def get_extension_for_platform():
     system = platform.system()
     
     if system == "Darwin":
-        # macOS: Use Makefile approach
+        # macOS: Use Makefile approach - builds into meds_etl_cpp/_native
         print("🍎 Detected macOS - using Makefile build")
-        return MakefileExtension("meds_etl_cpp", "Makefile.simple", ".")
+        return MakefileExtension("meds_etl_cpp._native", "Makefile.simple", ".")
     else:
-        # Linux and others: Use Bazel
+        # Linux and others: Use Bazel - builds into meds_etl_cpp/_native
         print("🐧 Detected Linux/other - using Bazel build")
-        return BazelExtension("meds_etl_cpp", "meds_etl_cpp.so", "native")
+        return BazelExtension("meds_etl_cpp._native", "meds_etl_cpp.so", "native")
 
 
 setuptools.setup(
