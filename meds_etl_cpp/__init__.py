@@ -1,16 +1,12 @@
+"""meds_etl_cpp - pure Python/Polars backend for meds_etl.
+
+Historically this package shipped a compiled C++/pybind11 extension. It is now a
+pure Python implementation built on top of Polars, with the same public API
+(:func:`perform_etl`) and output layout, so it remains a drop-in dependency for
+``meds_etl[cpp]`` while no longer requiring a native build toolchain.
 """
-meds_etl_cpp - High-performance C++ backend for meds_etl
 
-This module provides optimized implementations of MEDS ETL algorithms.
-"""
+from ._etl import perform_etl
 
-# Load pyarrow first to ensure Arrow dylibs are available
-# This is required on macOS where the native extension links against PyArrow's libraries
-import pyarrow as _pyarrow  # noqa: F401
-
-# Import everything from the native extension
-from ._native import *  # noqa: F401, F403
-
-__version__ = "0.1.0"
+__version__ = "0.4.0"
 __all__ = ["perform_etl"]
-
