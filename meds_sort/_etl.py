@@ -20,6 +20,7 @@ by the largest single shard rather than the whole dataset):
 
 from __future__ import annotations
 
+import os
 import re
 import shutil
 from concurrent.futures import ThreadPoolExecutor
@@ -29,6 +30,15 @@ from typing import Dict, List, Tuple
 import polars as pl
 
 __all__ = ["perform_etl"]
+
+# How many shards Stage B sorts concurrently. Each concurrent shard sort holds a
+# full (decompressed) shard in memory, so peak RSS scales roughly with this
+# value. Because each individual Polars sort already uses the whole thread pool,
+# pushing concurrency up to num_threads oversubscribes the CPU and inflates
+# memory for no speed benefit; a small cap is both faster and far leaner. Set the
+# MEDS_SORT_SHARD_CONCURRENCY env var to override (e.g. 1 to minimize memory).
+_SHARD_CONCURRENCY_ENV = "MEDS_SORT_SHARD_CONCURRENCY"
+_DEFAULT_MAX_SHARD_CONCURRENCY = 4
 
 # Columns that are not treated as generic "properties".
 _KNOWN_FIELDS = ("subject_id", "time")
@@ -174,7 +184,12 @@ def perform_etl(
         ``hash(subject_id) % num_shards`` so each subject lives in exactly one
         shard. Controls peak memory (memory is bounded by the largest shard).
     num_threads:
-        Maximum number of shards to sort concurrently.
+        Upper bound on the number of shards sorted concurrently in Stage B
+        (each Polars sort already uses the whole thread pool internally). The
+        effective concurrency is capped at a small default to avoid CPU
+        oversubscription and excessive peak memory; override with the
+        ``MEDS_SORT_SHARD_CONCURRENCY`` environment variable (set it to ``1`` to
+        minimize memory).
     """
     num_shards = int(num_shards)
     num_threads = int(num_threads)
@@ -232,7 +247,12 @@ def perform_etl(
         )
 
     if shard_dirs:
-        workers = max(1, min(num_threads, len(shard_dirs)))
+        env_concurrency = os.environ.get(_SHARD_CONCURRENCY_ENV)
+        if env_concurrency:
+            concurrency = max(1, int(env_concurrency))
+        else:
+            concurrency = min(num_threads, _DEFAULT_MAX_SHARD_CONCURRENCY)
+        workers = max(1, min(concurrency, len(shard_dirs)))
         if workers == 1:
             for shard_dir in shard_dirs:
                 _sort_shard(shard_dir)

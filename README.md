@@ -25,9 +25,17 @@ dataset:
   `<target>/data/<shard>.parquet` with ZSTD compression.
 - Copies `<source>/metadata` to `<target>/metadata` if present.
 
-Memory is bounded by the largest single shard (each shard is sorted
-independently), so the usual guidance still applies: use roughly as many shards
-as you have CPUs to keep peak memory in check.
+Memory is bounded by the largest single shard times the number of shards sorted
+concurrently. Stage B sorts a few shards at a time (each Polars sort already uses
+the whole thread pool, so a small concurrency is both faster and far leaner than
+sorting every shard at once). The usual guidance still applies: use roughly as
+many shards as you have CPUs to keep per-shard size, and thus peak memory, in
+check.
+
+To tune the memory/speed trade-off, set the `MEDS_SORT_SHARD_CONCURRENCY`
+environment variable (default: `min(num_threads, 4)`). Set it to `1` to minimize
+peak memory (lower than the old C++ backend), or higher to sort more shards in
+parallel.
 
 ## Installation
 
@@ -87,16 +95,21 @@ python benchmarks/bench.py --quick            # fast smoke run
 python benchmarks/bench.py --repeats 3 --sweep # fuller sweep, writes benchmarks/results/report.md
 ```
 
-On a 14-core Apple Silicon machine (Polars 1.35, pyarrow 22), the Polars
-implementation was **faster than the C++ backend in every configuration** while
-keeping peak memory in the same ballpark:
+On a 14-core Apple Silicon machine (Polars 1.35, pyarrow 22, `num_shards=14`),
+the Polars implementation was **faster than the C++ backend in every
+configuration**, at roughly comparable peak memory (and *lower* than C++ at the
+largest scale):
 
-| scale | rows | shards/threads | Polars wall | C++ wall | speedup | Polars RSS | C++ RSS |
-|---|---|---|---|---|---|---|---|
-| small | 100K | 14/14 | 0.03s | 0.04s | ~1.2x | 159 MiB | 119 MiB |
-| medium | 1M | 14/14 | 0.09s | 0.31s | ~3.4x | 464 MiB | 332 MiB |
-| large | 10M | 14/14 | 0.58s | 1.80s | ~3.1x | 2.2 GiB | 1.8 GiB |
-| wide (16 props) | 1M | 14/14 | 0.17s | 0.52s | ~3.1x | 1.2 GiB | 601 MiB |
+| scale | rows | Polars wall | C++ wall | speedup | Polars RSS | C++ RSS |
+|---|---|---|---|---|---|---|
+| small | 100K | 0.04s | 0.04s | ~1x | 147 MiB | 119 MiB |
+| medium | 1M | 0.11s | 0.31s | ~2.9x | 368 MiB | 332 MiB |
+| large | 10M | 0.57s | 1.80s | ~3.2x | 1.4 GiB | 1.8 GiB |
+| wide (16 props) | 1M | 0.18s | 0.52s | ~3.0x | 913 MiB | 601 MiB |
+
+Peak memory is tunable via `MEDS_SORT_SHARD_CONCURRENCY`; setting it to `1` drops
+the large case to ~1.0 GiB (below the C++ backend) while still running ~2x faster
+than C++.
 
 All equivalence checks pass. See `benchmarks/results/report.md` for the full
 sweep (including `num_shards`/`num_threads` scaling) and plots.
