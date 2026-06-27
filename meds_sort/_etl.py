@@ -1,8 +1,8 @@
 """Pure Python/Polars implementation of the MEDS Unsorted -> MEDS sort/shard ETL.
 
-This is a drop-in replacement for the former C++/pybind11 backend. It exposes a
-single function, :func:`perform_etl`, with the exact same signature and output
-layout as the native implementation, but relies only on Polars (a multithreaded,
+This is the implementation behind ``meds_sort`` (formerly distributed as the
+C++/pybind11 package ``meds_etl_cpp``). It exposes a single function,
+:func:`perform_etl`, but relies only on Polars (a multithreaded,
 larger-than-memory Rust engine) instead of a compiled extension.
 
 Pipeline (mirrors the original two-stage C++ design so peak memory stays bounded
@@ -86,7 +86,7 @@ def _unify_schema(
                 continue
             if name == "value":
                 raise ValueError(
-                    "meds_etl_cpp does not support generic 'value' fields; "
+                    "meds_sort does not support generic 'value' fields; "
                     "MEDS Unsorted data should use 'code'/'numeric_value'."
                 )
             seen.setdefault(name, {})[str(dtype)] = dtype

@@ -9,7 +9,7 @@ from pathlib import Path
 import polars as pl
 import pytest
 
-import meds_etl_cpp
+import meds_sort
 
 
 def _write_unsorted(source: Path) -> None:
@@ -59,7 +59,7 @@ def test_end_to_end(tmp_path: Path) -> None:
     (source / "metadata").mkdir(parents=True)
     (source / "metadata" / "dataset.json").write_text(json.dumps({"dataset_name": "x"}))
 
-    meds_etl_cpp.perform_etl(str(source), str(target), num_shards=4, num_threads=4)
+    meds_sort.perform_etl(str(source), str(target), num_shards=4, num_threads=4)
 
     # Metadata is copied.
     assert (target / "metadata" / "dataset.json").exists()
@@ -102,7 +102,7 @@ def test_global_sort_invariant(tmp_path: Path) -> None:
     target = tmp_path / "tgt"
     _write_unsorted(source)
 
-    meds_etl_cpp.perform_etl(str(source), str(target), num_shards=8, num_threads=2)
+    meds_sort.perform_etl(str(source), str(target), num_shards=8, num_threads=2)
 
     full = pl.concat(_read_all_outputs(target))
     # Within each subject, rows are sorted by time (nulls first).
@@ -126,7 +126,7 @@ def test_code_and_numeric_value_always_present(tmp_path: Path) -> None:
         }
     ).write_parquet(unsorted / "0.parquet")
 
-    meds_etl_cpp.perform_etl(str(source), str(target), num_shards=2, num_threads=1)
+    meds_sort.perform_etl(str(source), str(target), num_shards=2, num_threads=1)
 
     full = pl.concat(_read_all_outputs(target))
     assert full.columns == ["subject_id", "time", "code", "numeric_value", "extra"]
@@ -148,7 +148,7 @@ def test_conflicting_dtypes_raise(tmp_path: Path) -> None:
     ).write_parquet(unsorted / "1.parquet")
 
     with pytest.raises(ValueError, match="conflicting types"):
-        meds_etl_cpp.perform_etl(str(source), str(target), num_shards=2, num_threads=1)
+        meds_sort.perform_etl(str(source), str(target), num_shards=2, num_threads=1)
 
 
 def test_timezone_time_raises(tmp_path: Path) -> None:
@@ -161,7 +161,7 @@ def test_timezone_time_raises(tmp_path: Path) -> None:
     df.write_parquet(unsorted / "0.parquet")
 
     with pytest.raises(ValueError, match="timezone"):
-        meds_etl_cpp.perform_etl(str(source), str(target), num_shards=2, num_threads=1)
+        meds_sort.perform_etl(str(source), str(target), num_shards=2, num_threads=1)
 
 
 def test_value_column_raises(tmp_path: Path) -> None:
@@ -174,7 +174,7 @@ def test_value_column_raises(tmp_path: Path) -> None:
     ).write_parquet(unsorted / "0.parquet")
 
     with pytest.raises(ValueError, match="value"):
-        meds_etl_cpp.perform_etl(str(source), str(target), num_shards=2, num_threads=1)
+        meds_sort.perform_etl(str(source), str(target), num_shards=2, num_threads=1)
 
 
 def test_empty_input(tmp_path: Path) -> None:
@@ -183,7 +183,7 @@ def test_empty_input(tmp_path: Path) -> None:
     (source / "unsorted_data").mkdir(parents=True)
 
     # Should not raise, and should produce an (empty) data directory.
-    meds_etl_cpp.perform_etl(str(source), str(target), num_shards=2, num_threads=1)
+    meds_sort.perform_etl(str(source), str(target), num_shards=2, num_threads=1)
     assert (target / "data").exists()
     assert list((target / "data").glob("*.parquet")) == []
 
@@ -193,4 +193,16 @@ def test_invalid_num_shards(tmp_path: Path) -> None:
     target = tmp_path / "tgt"
     (source / "unsorted_data").mkdir(parents=True)
     with pytest.raises(ValueError, match="num_shards"):
-        meds_etl_cpp.perform_etl(str(source), str(target), num_shards=0, num_threads=1)
+        meds_sort.perform_etl(str(source), str(target), num_shards=0, num_threads=1)
+
+
+def test_meds_etl_cpp_shim_reexports_and_warns() -> None:
+    import importlib
+    import sys
+
+    # Ensure a fresh import so the deprecation warning fires.
+    sys.modules.pop("meds_etl_cpp", None)
+    with pytest.warns(DeprecationWarning, match="renamed to meds_sort"):
+        meds_etl_cpp = importlib.import_module("meds_etl_cpp")
+
+    assert meds_etl_cpp.perform_etl is meds_sort.perform_etl

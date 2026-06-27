@@ -3,9 +3,9 @@ requires = ["setuptools>=61"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "meds_etl_cpp"
+name = "meds_sort"
 version = "0.4.0"
-description = "Optimized MEDS Unsorted -> MEDS ETL, now implemented in pure Python/Polars (the former C++ backend has been deprecated)."
+description = "Sort and shard a MEDS Unsorted dataset into MEDS, implemented in pure Python/Polars (formerly meds_etl_cpp)."
 readme = "README.md"
 requires-python = ">=3.10"
 license = "Apache-2.0"
@@ -23,6 +23,7 @@ benchmark = [
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["meds_etl_cpp"]
+# meds_sort is the package; meds_etl_cpp is a deprecated compatibility shim.
+include = ["meds_sort", "meds_etl_cpp"]
 exclude = []
 namespaces = false

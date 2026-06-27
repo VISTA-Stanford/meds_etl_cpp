@@ -1,14 +1,15 @@
-# meds_etl_cpp
+# meds_sort
 
-Backend for the MEDS Unsorted -> MEDS sort/shard stage used by
+Sort and shard a **MEDS Unsorted** dataset into **MEDS** — the finalization
+stage used by
 [meds_etl](https://github.com/Medical-Event-Data-Standard/meds_etl).
 
-> **Note:** Despite the name, this package is now implemented in **pure
-> Python/Polars**. The original C++/pybind11 extension has been removed. The
-> public API and output are unchanged, so it remains a drop-in dependency for
-> `meds_etl[cpp]` while no longer requiring a native build toolchain (no Bazel,
-> no Arrow C++, no compiler). This repository is slated for deprecation in favor
-> of folding this logic directly into `meds_etl`.
+> **Renamed from `meds_etl_cpp`.** This package used to ship a C++/pybind11
+> extension under the name `meds_etl_cpp`. It is now implemented in **pure
+> Python/Polars** (no Bazel, no Arrow C++, no compiler) and is distributed as
+> `meds_sort`. The old `meds_etl_cpp` import path still works as a thin,
+> deprecated compatibility shim that re-exports `perform_etl`, so existing
+> `meds_etl[cpp]` users keep working. New code should `import meds_sort`.
 
 ## What it does
 
@@ -31,7 +32,7 @@ as you have CPUs to keep peak memory in check.
 ## Installation
 
 ```bash
-pip install meds_etl_cpp
+pip install meds_sort
 # or, for local development:
 pip install -e ".[test]"
 ```
@@ -44,14 +45,20 @@ pip install -e ".[test]"
 ## Usage
 
 ```python
-import meds_etl_cpp
+import meds_sort
 
-meds_etl_cpp.perform_etl(
+meds_sort.perform_etl(
     source_directory="meds_unsorted",
     target_directory="meds",
     num_shards=16,
     num_threads=16,
 )
+```
+
+The legacy import path remains available (with a `DeprecationWarning`):
+
+```python
+import meds_etl_cpp  # re-exports meds_sort.perform_etl
 ```
 
 ## Compatibility notes vs. the old C++ backend

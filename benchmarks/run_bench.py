@@ -6,8 +6,10 @@ JSON line of metrics to stdout. It is meant to be launched as a fresh subprocess
 this one run.
 
 Backends:
-  polars  -> meds_etl_cpp.perform_etl (the pure Python/Polars implementation)
+  polars  -> meds_sort.perform_etl (the pure Python/Polars implementation)
   cpp     -> the legacy compiled extension at meds_etl_cpp/_native.*.so
+            (only available if a built extension is present; it was removed
+            when this package was reimplemented in pure Python)
 """
 
 from __future__ import annotations
@@ -26,7 +28,7 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 
 def _load_polars_backend():
     sys.path.insert(0, str(REPO_ROOT))
-    from meds_etl_cpp import perform_etl  # noqa: WPS433
+    from meds_sort import perform_etl  # noqa: WPS433
 
     return perform_etl
 

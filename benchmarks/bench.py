@@ -211,7 +211,7 @@ def _write_report(
     df.write_csv(RESULTS_DIR / "results.csv")
 
     lines: List[str] = []
-    lines.append("# meds_etl_cpp benchmark: Polars vs C++\n")
+    lines.append("# meds_sort benchmark: Polars vs C++\n")
     lines.append("## Environment\n")
     for key, value in env.items():
         lines.append(f"- **{key}**: {value}")

@@ -1,12 +1,20 @@
-"""meds_etl_cpp - pure Python/Polars backend for meds_etl.
+"""Deprecated compatibility shim for :mod:`meds_sort`.
 
-Historically this package shipped a compiled C++/pybind11 extension. It is now a
-pure Python implementation built on top of Polars, with the same public API
-(:func:`perform_etl`) and output layout, so it remains a drop-in dependency for
-``meds_etl[cpp]`` while no longer requiring a native build toolchain.
+This package was renamed to ``meds_sort`` and reimplemented in pure
+Python/Polars (it no longer ships a C++ extension). Importing ``meds_etl_cpp``
+still works and re-exports :func:`meds_sort.perform_etl`, but new code should
+import ``meds_sort`` directly.
 """
 
-from ._etl import perform_etl
+import warnings
 
-__version__ = "0.4.0"
-__all__ = ["perform_etl"]
+from meds_sort import __version__, perform_etl
+
+warnings.warn(
+    "meds_etl_cpp has been renamed to meds_sort; import meds_sort instead. "
+    "The meds_etl_cpp name is a deprecated compatibility shim.",
+    DeprecationWarning,
+    stacklevel=2,
+)
+
+__all__ = ["perform_etl", "__version__"]
